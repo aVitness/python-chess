@@ -1,155 +1,78 @@
-WHITE = 1
-BLACK = 2
+import time
+import os
+from chess import *
+from tkinter import *
+from PIL import Image, ImageTk
 
 
-def correct_coords(row, col):
-    return 0 <= row < 8 and 0 <= col < 8
-
-
-def opponent(color):
-    return BLACK if color == WHITE else WHITE
-
-
-class Figure:
-    def __init__(self, color, char, moves, one_move):
-        self.color = color
-        self.char = char
-        self.moves = moves
-        self.one_move = one_move
-
-    def can_move(self, board, row, col, row_to, col_to):
-        move_row = 0 if row == row_to else [-1, 1][row_to - row > 0]
-        move_col = 0 if col == col_to else [-1, 1][col_to - col > 0]
-        if board.field[row][col].char == "N":
-            move_row = row_to - row
-            move_col = col_to - col
-        if (move_row, move_col) not in self.moves:
-            return False
-        while correct_coords(row + move_row, col + move_col):
-            row += move_row
-            col += move_col
-            if (row, col) == (row_to, col_to):
-                return True if not board.field[row][col] else board.field[row][col].color != self.color
-            if board.field[row][col]:
-                return False
-            if self.one_move:
-                return True
-        return False
-
-    def can_attack(self, board, row, col, row1, col1):
-        return self.can_move(board, row, col, row1, col1)
-
-
-class Pawn(Figure):  # Пешка
-    def __init__(self, color):
-        super().__init__(color, "P", {WHITE: [(1, 0), (2, 0), (1, 1), (1, -1)], BLACK: [(-1, 0), (-2, 0), (-1, 1), (-1, -1)]}[color], True)
-        self.moved = False
-
-    def can_move(self, board, row, col, row_to, col_to):
-        if (row_to - row, col_to - col) not in self.moves[:2 - self.moved]:
-            return False
-        move_row = 0 if row == row_to else [-1, 1][row_to - row > 0]
-        move_col = 0 if col == col_to else [-1, 1][col_to - col > 0]
-        for i in range(2):
-            row += move_row
-            col += move_col
-            if board.field[row][col]:
-                return False
-            if (row, col) == (row_to, col_to):
-                return True
-            if self.moved:
-                return False
-        return False
-
-    def can_attack(self, board, row, col, row1, col1):
-        move_row = row1 - row
-        move_col = col1 - col
-        if (move_row, move_col) not in self.moves[2:]:
-            return False
-        if board.field[row1][col1]:
-            if board.field[row1][col1].color != self.color:
-                return True
-        return False
-
-
-
-
-
-class Knight(Figure):  # Конь
-    def __init__(self, color):
-        super().__init__(color, "N", [(-1, 2), (1, 2), (2, 1), (2, -1), (1, -2), (-1, -2), (-2, -1), (-2, 1)], True)
-
-
-class Rook(Figure):  # Ладья
-    def __init__(self, color):
-        super().__init__(color, "R", [(0, 1), (0, -1), (1, 0), (-1, 0)], False)
-        self.moved = False
-
-
-class King(Figure):  # Король
-    def __init__(self, color):
-        super().__init__(color, "K", [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (-1, 1), (1, -1)], True)
-        self.moved = False
-
-
-class Queen(Figure):  # Ферзь
-    def __init__(self, color):
-        super().__init__(color, "Q", [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (-1, 1), (1, -1)], False)
-
-
-class Bishop(Figure):  # Слон
-    def __init__(self, color):
-        super().__init__(color, "B", [(1, 1), (-1, -1), (-1, 1), (1, -1)], False)
-
-
-class Board:
-    def __init__(self):
-        self.color = WHITE
-        self.game_over = False
-        self.field = [[None for i in range(8)] for j in range(8)]
-        self.field[0] = [Rook(WHITE), Knight(WHITE), Bishop(WHITE), Queen(WHITE),
-                         King(WHITE), Bishop(WHITE), Knight(WHITE), Rook(WHITE)]
-        self.field[1] = [Pawn(WHITE), Pawn(WHITE), Pawn(WHITE), Pawn(WHITE),
-                         Pawn(WHITE), Pawn(WHITE), Pawn(WHITE), Pawn(WHITE)]
-        self.field[6] = [Pawn(BLACK), Pawn(BLACK), Pawn(BLACK), Pawn(BLACK),
-                         Pawn(BLACK), Pawn(BLACK), Pawn(BLACK), Pawn(BLACK)]
-        self.field[7] = [Rook(BLACK), Knight(BLACK), Bishop(BLACK), Queen(BLACK),
-                         King(BLACK), Bishop(BLACK), Knight(BLACK), Rook(BLACK)]
-
-    def cell(self, row, col):
-        if not correct_coords(row, col):
-            return None
-        piece = self.field[row][col]
-        return f"{['b', 'w'][piece.color == WHITE]}{piece.char}" if piece else "  "
-
-    def get_piece(self, row, col):
-        return self.field[row][col] if correct_coords(row, col) else None
-
-    def move_piece(self, row, col, row1, col1):
-        if not correct_coords(row, col) or not correct_coords(row1, col1) or (row, col) == (row1, col1):
-            return False
-        piece = self.field[row][col]
-        if piece is None:
-            return False
-        if piece.color != self.color:
-            return False
-        if self.field[row1][col1] is None:
-            if not piece.can_move(self, row, col, row1, col1):
-                return False
-        elif self.field[row1][col1].color == opponent(piece.color):
-            if not piece.can_attack(self, row, col, row1, col1):
-                return False
+def click(event):
+    global row, col, row1, col1
+    if row is None:
+        row, col = 7 - (root.winfo_pointery() - root.winfo_rooty() - 80) // 80, (root.winfo_pointerx() - root.winfo_rootx() - 80) // 80
+        cell = board.field[row][col]
+        if not cell:
+            row, col = None, None
+        elif cell.color != board.color:
+            row, col = None, None
         else:
-            return False
-        if self.field[row1][col1]:
-            if self.field[row1][col1].char == "K":
-                self.game_over = self.color
-        self.field[row][col] = None  # Снять фигуру.
-        self.field[row1][col1] = piece  # Поставить на новое место.
-        if row1 in {0, 7}:
-            if piece.char == "P":
-                self.field[row1][col1] = Queen(self.color)
-        self.color = opponent(self.color)
-        if self.field[row1][col1].char in {"P", "R", "K"}:
-            self.field[row1][col1].moved = True
-        return True
+            for d in cell.moves:
+                temp_row, temp_col = row, col
+                while True:
+                    temp_row += d[0]
+                    temp_col += d[1]
+                    if not correct_coords(temp_row, temp_col):
+                        break
+                    if cell.can_move(board, row, col, temp_row, temp_col):
+                        Label(root, image=images[board.cell(temp_row, temp_col)], borderwidth=2, relief="solid", bg="#bcefd0").place(
+                            x=120 + 80 * temp_col,
+                            y=680 - 80 * temp_row,
+                            anchor="center")
+                    if cell.char == "P":
+                        if cell.can_attack(board, row, col, temp_row, temp_col):
+                            Label(root, image=images[board.cell(temp_row, temp_col)], borderwidth=2, relief="solid",
+                                  bg="#bcefd0").place(
+                                x=120 + 80 * temp_col,
+                                y=680 - 80 * temp_row,
+                                anchor="center")
+                    if cell.one_move:
+                        break
+
+
+    else:
+        row1, col1 = 7 - (root.winfo_pointery() - root.winfo_rooty() - 80) // 80, (
+                    root.winfo_pointerx() - root.winfo_rootx() - 80) // 80
+        if board.move_piece(row, col, row1, col1):
+            root.title("Ход: "+ {WHITE: "белые", BLACK: "черные"}[board.color])
+        update_board()
+        if board.game_over:
+            time.sleep(0.5)
+            root.destroy()
+            end = Tk()
+            end.title("Конец игры")
+            T = Text(end, height=5, width=52)
+            T.pack()
+            T.insert(END, f"Игра завершена.\nПобедил {'БЕЛЫЙ' if board.game_over == WHITE else 'ЧЕРНЫЙ'} игрок!")
+            end.mainloop()
+
+        row, col, row1, col1 = None, None, None, None
+
+
+
+
+def update_board():
+    for x in range(8):
+        for y in range(8):
+            Label(root, image=images[board.cell(x, y)], borderwidth=2, bg=["#bf6d24", "#ffe4cd"][(x + y) % 2], relief="solid").place(x=120 + 80 * y,
+                                                                                          y=680 - 80 * x,
+                                                                                          anchor="center")
+
+board = Board()
+root = Tk()
+row, col, row1, col1 = None, None, None, None
+root.title("Ход: "+ {WHITE: "белые", BLACK: "черные"}[board.color])
+root.minsize(width=800, height=800)
+root.bind('<Button-1>', click)
+images = {x[:2]: ImageTk.PhotoImage(Image.open("assets/" + x).resize((80, 80))) for x in os.listdir("assets")}
+images["  "] = ImageTk.PhotoImage(Image.new('RGBA', (80, 80), (255, 0, 0, 0)))
+update_board()
+root.mainloop()
