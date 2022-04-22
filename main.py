@@ -1,4 +1,3 @@
-import time
 import os
 from chess import *
 from tkinter import *
@@ -45,15 +44,17 @@ def click(event):
             root.title("Ход: "+ {WHITE: "белые", BLACK: "черные"}[board.color])
         update_board()
         if board.game_over:
-            time.sleep(0.5)
-            root.destroy()
-            end = Tk()
-            end.title("Конец игры")
-            T = Text(end, height=5, width=52)
+            root.unbind('<Button-1>')
+            root.title("Конец игры")
+            T = Text(root, height=2, width=20, font=("Courier", 35))
             T.pack()
-            T.insert(END, f"Игра завершена.\nПобедил {'БЕЛЫЙ' if board.game_over == WHITE else 'ЧЕРНЫЙ'} игрок!")
-            end.mainloop()
-
+            return T.insert(END, f"  Игра завершена.\nПобедил {'БЕЛЫЙ' if board.game_over == WHITE else 'ЧЕРНЫЙ'} игрок!")
+        x, y = board.king_pos[board.color]
+        if board.is_under_attack(x, y):
+            Label(root, image=images[board.cell(x, y)], borderwidth=2, bg="#ff0000",
+                  relief="solid").place(x=120 + 80 * y,
+                                        y=680 - 80 * x,
+                                        anchor="center")
         row, col, row1, col1 = None, None, None, None
 
 

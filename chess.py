@@ -62,9 +62,7 @@ class Pawn(Figure):  # Пешка
         return False
 
     def can_attack(self, board, row, col, row1, col1):
-        move_row = row1 - row
-        move_col = col1 - col
-        if (move_row, move_col) not in self.moves[2:]:
+        if (row1 - row, col1 - col) not in self.moves[2:]:
             return False
         if board.field[row1][col1]:
             if board.field[row1][col1].color != self.color:
@@ -91,6 +89,16 @@ class King(Figure):  # Король
         super().__init__(color, "K", [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (-1, 1), (1, -1)], True)
         self.moved = False
 
+    def can_move(self, board, row, col, row_to, col_to):
+        if (row_to - row, col_to - col) not in self.moves:
+            return False
+        board.field[row][col], board.field[row_to][col_to] = board.field[row_to][col_to], board.field[row][col]
+        if board.is_under_attack(row_to, col_to):
+            board.field[row][col], board.field[row_to][col_to] = board.field[row_to][col_to], board.field[row][col]
+            return False
+        board.field[row][col], board.field[row_to][col_to] = board.field[row_to][col_to], board.field[row][col]
+        return True if not board.field[row_to][col_to] else board.field[row_to][col_to].color != self.color
+
 
 class Queen(Figure):  # Ферзь
     def __init__(self, color):
@@ -104,6 +112,7 @@ class Bishop(Figure):  # Слон
 
 class Board:
     def __init__(self):
+        self.king_pos = {WHITE: [0, 4], BLACK: [7, 4]}
         self.color = WHITE
         self.game_over = False
         self.field = [[None for i in range(8)] for j in range(8)]
@@ -146,6 +155,8 @@ class Board:
                 self.game_over = self.color
         self.field[row][col] = None  # Снять фигуру.
         self.field[row1][col1] = piece  # Поставить на новое место.
+        if piece.char == "K":
+            self.king_pos[self.color] = [row1, col1]
         if row1 in {0, 7}:
             if piece.char == "P":
                 self.field[row1][col1] = Queen(self.color)
@@ -153,3 +164,26 @@ class Board:
         if self.field[row1][col1].char in {"P", "R", "K"}:
             self.field[row1][col1].moved = True
         return True
+
+    def is_under_attack(self, row, col):
+        for x, y in [(-1, 2), (1, 2), (2, 1), (2, -1), (1, -2), (-1, -2), (-2, -1), (-2, 1)]:
+            if not correct_coords(row + x, col + y):
+                continue
+            if self.field[row + x][col + y]:
+                if self.field[row + x][col + y].color == self.color:
+                    continue
+                if self.field[row + x][col + y].can_attack(self, row + x, col + y, row, col):
+                    return True
+        for x, y in [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (-1, 1), (1, -1)]:
+            temp_row, temp_col = row, col
+            while correct_coords(temp_row + x, temp_col + y):
+                temp_row += x
+                temp_col += y
+                if self.field[temp_row][temp_col]:
+                    if self.field[temp_row][temp_col].color == self.color:
+                        break
+                    if self.field[temp_row][temp_col].can_attack(self, temp_row, temp_col, row, col):
+                        return True
+                    else:
+                        break
+        return False
